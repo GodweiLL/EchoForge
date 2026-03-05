@@ -10,6 +10,6 @@ result = generate_video.invoke({
     "image_url": "https://ark-project.tos-cn-beijing.volces.com/doc_image/seepro_i2v.png",
     "duration": 5,
     "resolution": "720p",
-    "ratio": "16:9",
+    "ratio": "9:16",
 })
 print(result)

@@ -124,8 +124,10 @@ def concat_videos(
         try:
             subprocess.run(
                 ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", list_file, "-c", "copy", str(out)],
-                check=True, capture_output=True,
+                check=True, capture_output=True, text=True,
             )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"ffmpeg 失败 (exit {e.returncode}):\n{e.stderr}") from e
         finally:
             Path(list_file).unlink(missing_ok=True)
             for f in _tmp_files:
@@ -174,8 +176,10 @@ def concat_videos(
                 "-map", "[vout]", "-map", "[aout]",
                 str(out),
             ],
-            check=True, capture_output=True,
+            check=True, capture_output=True, text=True,
         )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"ffmpeg 失败 (exit {e.returncode}):\n{e.stderr}") from e
     finally:
         for f in _tmp_files:
             Path(f).unlink(missing_ok=True)

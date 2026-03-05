@@ -1,12 +1,9 @@
-"""Image generator tool — uses Volcano Engine (火山引擎) doubao-seedream to generate images.
+"""Image generator tool — uses Volcano Engine (火山引擎) doubao-seedream to generate images."""
 
-Supports three modes:
-  1. Text-to-image: only prompt provided
-  2. Single reference image: prompt + one image URL
-  3. Multiple reference images: prompt + list of image URLs
-"""
-
+import base64
 import os
+import uuid
+from pathlib import Path
 from typing import Optional, Union
 
 import requests
@@ -14,6 +11,17 @@ from dotenv import load_dotenv
 from langchain_core.tools import tool
 
 load_dotenv()
+
+_OUTPUT_DIR = Path(__file__).parent.parent / "outputs" / "images"
+
+
+def _to_api_ref(path_or_url: str) -> str:
+    """将本地路径转为 base64 data URL，URL 则原样返回。"""
+    if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
+        return path_or_url
+    p = Path(path_or_url)
+    mime = "image/jpeg" if p.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+    return f"data:{mime};base64,{base64.b64encode(p.read_bytes()).decode()}"
 
 
 @tool
@@ -24,18 +32,17 @@ def generate_image(
 ) -> str:
     """调用火山引擎生成图片，支持三种模式：
     1. 文生图：仅传 prompt
-    2. 单张参考图生图：传 prompt + 单个图片 URL
-    3. 多张参考图生图：传 prompt + 图片 URL 列表
+    2. 单张参考图生图：传 prompt + 单个图片本地路径
+    3. 多张参考图生图：传 prompt + 图片本地路径列表
 
     Args:
         prompt: 图片生成的文字描述。
-        image: 参考图片，可为单个 URL 字符串或 URL 列表，不传则为纯文生图。
+        image: 参考图片，可为单个本地路径或路径列表，不传则为纯文生图。
         size: 图片尺寸，格式为 '宽x高'，像素总数须 >= 3686400。
-              例如 '2560x1440'(16:9 横屏)、'1440x2560'(9:16 竖屏)、'2048x2048'(1:1 方图)。
-              宽高比范围 [1/16, 16]，最大 4096x4096。默认 '2560x1440'。
+              例如 '2560x1440'(16:9 横屏)、'1440x2560'(9:16 竖屏)。默认 '2560x1440'。
 
     Returns:
-        生成图片的 URL。
+        生成图片保存的本地路径。
     """
     api_key = os.environ["VOLC_API_KEY"]
     base_url = os.environ.get("VOLC_API_BASE", "https://ark.cn-beijing.volces.com/api/v3")
@@ -52,20 +59,26 @@ def generate_image(
     }
 
     if image is not None:
-        payload["image"] = image
+        payload["image"] = (
+            [_to_api_ref(i) for i in image] if isinstance(image, list) else _to_api_ref(image)
+        )
 
-    response = requests.post(
+    resp = requests.post(
         f"{base_url}/images/generations",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         json=payload,
         timeout=120,
     )
-    if not response.ok:
-        raise RuntimeError(f"API 错误 {response.status_code}: {response.text}")
-    response.raise_for_status()
+    if not resp.ok:
+        raise RuntimeError(f"生图失败 {resp.status_code}: {resp.text}")
 
-    data = response.json()
-    return data["data"][0]["url"]
+    url = resp.json()["data"][0]["url"]
+
+    _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    img_resp = requests.get(url, timeout=60)
+    img_resp.raise_for_status()
+
+    local_path = _OUTPUT_DIR / f"{uuid.uuid4().hex}.jpg"
+    local_path.write_bytes(img_resp.content)
+
+    return str(local_path)
