@@ -12,11 +12,11 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 
 from agent.prompts import SYSTEM_PROMPT
-from tools import concat_videos, generate_image, generate_video, analyze_video, check_subjects
+from tools import concat_videos, generate_image, generate_video, analyze_video, check_subjects, search_images
 
 load_dotenv()
 
-_TOOLS = [analyze_video, check_subjects, generate_image, generate_video, concat_videos]
+_TOOLS = [analyze_video, check_subjects, search_images, generate_image, generate_video, concat_videos]
 
 _MIME_MAP = {
     ".mp4": "video/mp4",
