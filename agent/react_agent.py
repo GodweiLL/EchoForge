@@ -7,7 +7,8 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage
+from langchain.agents.middleware import wrap_tool_call
+from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -17,6 +18,18 @@ from tools import concat_videos, generate_image, generate_video, analyze_video, 
 load_dotenv()
 
 _TOOLS = [analyze_video, check_subjects, search_images, generate_image, generate_video, concat_videos]
+
+
+@wrap_tool_call
+def _handle_tool_errors(request, handler):
+    """捕获工具执行异常，返回错误信息让 agent 自行调整重试。"""
+    try:
+        return handler(request)
+    except Exception as e:
+        return ToolMessage(
+            content=f"[工具错误] {type(e).__name__}: {e}\n请调整参数后重试。",
+            tool_call_id=request.tool_call["id"],
+        )
 
 _MIME_MAP = {
     ".mp4": "video/mp4",
@@ -37,6 +50,7 @@ def build_agent():
         _TOOLS,
         system_prompt=SYSTEM_PROMPT,
         checkpointer=MemorySaver(),
+        middleware=[_handle_tool_errors],
     )
 
 

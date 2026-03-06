@@ -142,7 +142,7 @@ def concat_videos(
 
     parts = []
     for i in range(n):
-        parts.append(f"[{i}:v]setsar=1[v{i}]")
+        parts.append(f"[{i}:v]setsar=1,settb=AVTB[v{i}]")
 
     cumulative = 0.0
     v_prev = "v0"

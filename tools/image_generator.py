@@ -16,9 +16,13 @@ _OUTPUT_DIR = Path(__file__).parent.parent / "outputs" / "images"
 
 
 def _to_api_ref(path_or_url: str) -> str:
-    """将本地路径转为 base64 data URL，URL 则原样返回。"""
+    """将本地路径或远程 URL 统一转为 base64 data URL。"""
     if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
-        return path_or_url
+        resp = requests.get(path_or_url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+        resp.raise_for_status()
+        ct = resp.headers.get("Content-Type", "image/jpeg")
+        mime = ct.split(";")[0].strip()
+        return f"data:{mime};base64,{base64.b64encode(resp.content).decode()}"
     p = Path(path_or_url)
     mime = "image/jpeg" if p.suffix.lower() in (".jpg", ".jpeg") else "image/png"
     return f"data:{mime};base64,{base64.b64encode(p.read_bytes()).decode()}"
